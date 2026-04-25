@@ -1,0 +1,40 @@
+{
+  "name": "drizzle-pg-kit-migrator",
+  "version": "0.1.0",
+  "description": "CLI glue for managing a Drizzle schema with @pgkit/migrator and @pgkit/migra: generate schema.sql, diff to create migrations, run pgkit migrations.",
+  "type": "module",
+  "bin": {
+    "drizzle-pg-kit-migrator": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "pnpm build",
+    "dev": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@pgkit/migra": "^0.6.1",
+    "@pgkit/migrator": "^0.6.1",
+    "commander": "^12.1.0",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.20.0",
+    "prettier": "^3.8.3",
+    "winston": "^3.19.0"
+  },
+  "peerDependencies": {
+    "drizzle-kit": ">=0.30.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

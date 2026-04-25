@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dpkmtest
+      POSTGRES_PASSWORD: dpkmtest
+      POSTGRES_DB: dpkmtest
+    ports:
+      - "5455:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dpkmtest -d dpkmtest"]
+      interval: 1s
+      timeout: 5s
+      retries: 30

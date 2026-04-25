@@ -9,6 +9,14 @@
     "url": "git+https://github.com/felamaslen/drizzle-pg-kit-migrator.git"
   },
   "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "bin": {
     "drizzle-pg-kit-migrator": "dist/cli.js"
   },
@@ -29,6 +37,8 @@
     "drizzle-orm": "^0.45.2",
     "pg": "^8.20.0",
     "prettier": "^3.8.3",
+    "prettier-plugin-sql": "^0.20.0",
+    "tsx": "^4.20.0",
     "winston": "^3.19.0"
   },
   "peerDependencies": {
@@ -37,7 +47,6 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/pg": "^8.20.0",
-    "tsx": "^4.20.0",
     "typescript": "~5.9.2"
   },
   "engines": {

@@ -44,7 +44,7 @@ export async function backfillMigrations(opts: BackfillOptions): Promise<void> {
     for (const file of files) {
       if (!file.endsWith(".sql")) continue;
       const content = await readFile(resolve(migrationsDirectory, file), "utf8");
-      logger.info("Backfilling migration", { name: file });
+      logger.info(`Backfilling migration ${file}`);
       await pool.query(
         `insert into ${pg.escapeIdentifier(schema)}.migrations (name, content, status, date)
          select $1 as name, $2 as content, $3 as status, to_timestamp(d.created_at / 1000) as date

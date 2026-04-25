@@ -6,14 +6,19 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { StringChunk } from "drizzle-orm";
 import * as prettier from "prettier";
+import { tsImport } from "tsx/esm/api";
 
 import { PgCustomSQL } from "./sql.js";
+
+const require = createRequire(import.meta.url);
+const prettierSqlPlugin = require.resolve("prettier-plugin-sql");
 
 export interface GenerateSchemaOptions {
   /** Drizzle schema directory (passed to `drizzle-kit generate --schema`). */
@@ -34,9 +39,36 @@ const DEFAULT_HEADER = [
 
 function sqlToString(sql: { queryChunks: unknown[] }): string {
   return sql.queryChunks
-    .flatMap((chunk) => (chunk instanceof StringChunk ? chunk.value : []))
+    .flatMap((chunk) => {
+      if (chunk instanceof StringChunk) return chunk.value;
+      // `tsImport` loads the schema in a fresh module graph, so a `StringChunk`
+      // built there is not the same class as ours. Fall back to a structural
+      // check on the chunk's `value` array.
+      if (
+        chunk &&
+        typeof chunk === "object" &&
+        Array.isArray((chunk as { value?: unknown }).value)
+      ) {
+        return (chunk as { value: string[] }).value;
+      }
+      return [];
+    })
     .join("")
     .trim();
+}
+
+function isPgCustomSQL(value: unknown): value is PgCustomSQL {
+  if (value instanceof PgCustomSQL) return true;
+  // Cross-realm fallback (see comment in `sqlToString`).
+  if (
+    value &&
+    typeof value === "object" &&
+    value.constructor?.name === "PgCustomSQL" &&
+    "sql" in value
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export async function generateSchemaSql(
@@ -86,16 +118,24 @@ export async function generateSchemaSql(
     .filter((f) => f.endsWith(".ts") || f.endsWith(".js") || f.endsWith(".mjs"))
     .sort();
 
+  const parentUrl = import.meta.url;
+  const seen = new Set<string>();
   for (const file of schemaFiles) {
     const fileUrl = pathToFileURL(path.resolve(schemaDir, file)).href;
-    const mod = (await import(fileUrl)) as Record<string, unknown>;
+    const mod = (await tsImport(fileUrl, parentUrl)) as Record<string, unknown>;
     for (const value of Object.values(mod)) {
-      if (value instanceof PgCustomSQL) {
-        snippets.push({
-          text: sqlToString(value.sql),
-          priority: value.options?.priority ?? 0,
-        });
-      }
+      if (!isPgCustomSQL(value)) continue;
+      const text = sqlToString(
+        value.sql as unknown as { queryChunks: unknown[] },
+      );
+      const priority = value.options?.priority ?? 0;
+      const key = `${priority}\0${text}`;
+      // A schema `index.ts` that re-exports from sibling files would otherwise
+      // make every snippet appear twice — once on direct import, once via the
+      // re-export. Dedupe on `(priority, text)`.
+      if (seen.has(key)) continue;
+      seen.add(key);
+      snippets.push({ text, priority });
     }
   }
 
@@ -113,11 +153,12 @@ export async function generateSchemaSql(
   parts.push(migrationSql.trim());
   if (postMigration.length > 0) parts.push(postMigration.join("\n\n"));
 
-  const prettierConfig = await prettier.resolveConfig(schemaFile);
   const raw = parts.join("\n\n") + "\n";
   const output = await prettier.format(raw, {
-    ...prettierConfig,
-    filepath: schemaFile,
+    parser: "sql",
+    plugins: [prettierSqlPlugin],
+    language: "postgresql",
+    keywordCase: "upper",
   });
 
   writeFileSync(schemaFile, output);

@@ -1,11 +1,15 @@
-import { execSync } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 
 import { run as migra } from "@pgkit/migra";
 import pg from "pg";
+import * as prettier from "prettier";
 
 import { createMigrator } from "./migrator.js";
+
+const require = createRequire(import.meta.url);
+const prettierSqlPlugin = require.resolve("prettier-plugin-sql");
 
 export interface CreateMigrationOptions {
   databaseUrl: string;
@@ -139,15 +143,17 @@ export async function createMigration(
 
     const fileName = `${timestamp()}-${opts.name!}.sql`;
     const filePath = path.join(migrationsDir, fileName);
-    fs.writeFileSync(filePath, `${trimmed}\n`);
 
+    let formatted = `${trimmed}\n`;
     if (opts.formatWithPrettier !== false) {
-      try {
-        execSync(`npx prettier --write ${filePath}`, { stdio: "pipe" });
-      } catch {
-        // ignore prettier failures — file is still written
-      }
+      formatted = await prettier.format(formatted, {
+        parser: "sql",
+        plugins: [prettierSqlPlugin],
+        language: "postgresql",
+        keywordCase: "upper",
+      });
     }
+    fs.writeFileSync(filePath, formatted);
 
     return { noChanges: false, migrationFilePath: filePath, sql: trimmed };
   } finally {

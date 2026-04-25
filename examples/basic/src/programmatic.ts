@@ -20,7 +20,7 @@ import {
   createMigration,
   createMigrator,
   generateSchemaSql,
-} from "drizzle-pg-kit-migrator";
+} from "drizzle-pgkit-migrator";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const exampleRoot = path.resolve(here, "..");

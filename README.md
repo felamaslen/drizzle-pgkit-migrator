@@ -1,4 +1,4 @@
-# drizzle-pg-kit-migrator
+# drizzle-pgkit-migrator
 
 CLI glue between [drizzle-kit](https://orm.drizzle.team/kit-docs/overview) and [`@pgkit/migrator`](https://www.npmjs.com/package/@pgkit/migrator) / [`@pgkit/migra`](https://www.npmjs.com/package/@pgkit/migra).
 
@@ -25,13 +25,13 @@ It lets you keep authoring your schema in Drizzle while running migrations with 
 ## Install
 
 ```sh
-npm install --save-dev drizzle-pg-kit-migrator drizzle-kit
+npm install --save-dev drizzle-pgkit-migrator drizzle-kit
 ```
 
 ## CLI
 
 ```sh
-npx drizzle-pg-kit-migrator <command> [options]
+npx drizzle-pgkit-migrator <command> [options]
 ```
 
 All commands accept `--database-url` (or read `DATABASE_URL` from the environment).
@@ -39,7 +39,7 @@ All commands accept `--database-url` (or read `DATABASE_URL` from the environmen
 ### `generate-schema`
 
 ```sh
-npx drizzle-pg-kit-migrator generate-schema \
+npx drizzle-pgkit-migrator generate-schema \
   --schema-dir src/db/schema \
   --schema-file src/db/__generated__/schema.sql
 ```
@@ -49,7 +49,7 @@ Runs `drizzle-kit generate` into a temp dir, then weaves in any `pgCustomSQL` sn
 ### `create`
 
 ```sh
-npx drizzle-pg-kit-migrator create \
+npx drizzle-pgkit-migrator create \
   --schema-file src/db/__generated__/schema.sql \
   --migrations-dir src/db/migrations \
   --name add_users_table
@@ -60,8 +60,8 @@ Use `--exit-code` instead of `--name` to fail CI when there's drift but write no
 ### `migrate`
 
 ```sh
-npx drizzle-pg-kit-migrator migrate --migrations-dir src/db/migrations up
-npx drizzle-pg-kit-migrator migrate --migrations-dir src/db/migrations list
+npx drizzle-pgkit-migrator migrate --migrations-dir src/db/migrations up
+npx drizzle-pgkit-migrator migrate --migrations-dir src/db/migrations list
 ```
 
 Everything after the migrator-level options is forwarded to `@pgkit/migrator`'s own CLI.
@@ -69,7 +69,7 @@ Everything after the migrator-level options is forwarded to `@pgkit/migrator`'s 
 ### `backfill`
 
 ```sh
-npx drizzle-pg-kit-migrator backfill --migrations-dir src/db/migrations
+npx drizzle-pgkit-migrator backfill --migrations-dir src/db/migrations
 ```
 
 Marks every `.sql` file in `--migrations-dir` as already applied, copying the timestamps from `drizzle.__drizzle_migrations`.
@@ -85,7 +85,7 @@ import {
   createMigrator,
   backfillMigrations,
   pgCustomSQL,
-} from "drizzle-pg-kit-migrator";
+} from "drizzle-pgkit-migrator";
 ```
 
 ## `pgCustomSQL`
@@ -94,7 +94,7 @@ Use this in your Drizzle schema to inject raw SQL into the generated `schema.sql
 
 ```ts
 import { sql } from "drizzle-orm";
-import { pgCustomSQL } from "drizzle-pg-kit-migrator";
+import { pgCustomSQL } from "drizzle-pgkit-migrator";
 
 export const fuzzystrmatch = pgCustomSQL(
   sql`CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;`,

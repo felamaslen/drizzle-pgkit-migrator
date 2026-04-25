@@ -20,7 +20,7 @@ function defaultDatabaseUrl(): string {
 const program = new Command();
 
 program
-  .name("drizzle-pg-kit-migrator")
+  .name("drizzle-pgkit-migrator")
   .description(
     "Glue between drizzle-kit and @pgkit/migrator: generate schema.sql from a Drizzle schema, diff to create migrations, and run them with pgkit.",
   )

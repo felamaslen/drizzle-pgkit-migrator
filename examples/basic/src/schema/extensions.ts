@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgCustomSQL } from "drizzle-pg-kit-migrator";
+import { pgCustomSQL } from "drizzle-pgkit-migrator";
 
 /**
  * Demonstrates a *negative-priority* `pgCustomSQL` snippet: this CREATE

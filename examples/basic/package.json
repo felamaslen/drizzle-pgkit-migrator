@@ -1,17 +1,17 @@
 {
-  "name": "drizzle-pg-kit-migrator-example",
+  "name": "drizzle-pgkit-migrator-example",
   "private": true,
   "type": "module",
   "scripts": {
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down -v",
-    "db:generate": "drizzle-pg-kit-migrator generate-schema --schema-dir src/schema --schema-file __generated__/schema.sql",
-    "db:create": "npm run db:generate && DATABASE_URL=$npm_package_config_databaseUrl drizzle-pg-kit-migrator create --schema-file __generated__/schema.sql --migrations-dir migrations",
-    "db:drift": "npm run db:generate && DATABASE_URL=$npm_package_config_databaseUrl drizzle-pg-kit-migrator create --schema-file __generated__/schema.sql --migrations-dir migrations --exit-code",
-    "db:migrate": "DATABASE_URL=$npm_package_config_databaseUrl drizzle-pg-kit-migrator migrate --migrations-dir migrations up",
-    "db:migrate:list": "DATABASE_URL=$npm_package_config_databaseUrl drizzle-pg-kit-migrator migrate --migrations-dir migrations list",
-    "db:migrate:down": "DATABASE_URL=$npm_package_config_databaseUrl drizzle-pg-kit-migrator migrate --migrations-dir migrations down",
-    "db:backfill": "DATABASE_URL=$npm_package_config_databaseUrl drizzle-pg-kit-migrator backfill --migrations-dir migrations",
+    "db:generate": "drizzle-pgkit-migrator generate-schema --schema-dir src/schema --schema-file __generated__/schema.sql",
+    "db:create": "npm run db:generate && DATABASE_URL=$npm_package_config_databaseUrl drizzle-pgkit-migrator create --schema-file __generated__/schema.sql --migrations-dir migrations",
+    "db:drift": "npm run db:generate && DATABASE_URL=$npm_package_config_databaseUrl drizzle-pgkit-migrator create --schema-file __generated__/schema.sql --migrations-dir migrations --exit-code",
+    "db:migrate": "DATABASE_URL=$npm_package_config_databaseUrl drizzle-pgkit-migrator migrate --migrations-dir migrations up",
+    "db:migrate:list": "DATABASE_URL=$npm_package_config_databaseUrl drizzle-pgkit-migrator migrate --migrations-dir migrations list",
+    "db:migrate:down": "DATABASE_URL=$npm_package_config_databaseUrl drizzle-pgkit-migrator migrate --migrations-dir migrations down",
+    "db:backfill": "DATABASE_URL=$npm_package_config_databaseUrl drizzle-pgkit-migrator backfill --migrations-dir migrations",
     "programmatic": "DATABASE_URL=$npm_package_config_databaseUrl tsx src/programmatic.ts"
   },
   "config": {
@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
-    "drizzle-pg-kit-migrator": "file:../..",
+    "drizzle-pgkit-migrator": "file:../..",
     "pg": "^8.20.0"
   },
   "devDependencies": {

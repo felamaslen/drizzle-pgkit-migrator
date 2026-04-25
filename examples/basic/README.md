@@ -1,6 +1,6 @@
 # Example: basic
 
-A self-contained example that uses every feature of `drizzle-pg-kit-migrator` against a Postgres container.
+A self-contained example that uses every feature of `drizzle-pgkit-migrator` against a Postgres container.
 
 ## What it shows
 

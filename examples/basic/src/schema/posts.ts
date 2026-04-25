@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { pgCustomSQL } from "drizzle-pg-kit-migrator";
+import { pgCustomSQL } from "drizzle-pgkit-migrator";
 
 import { users } from "./users.js";
 

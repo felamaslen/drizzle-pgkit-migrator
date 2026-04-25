@@ -19,7 +19,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepublishOnly": "pnpm build",
+    "prepublishOnly": "npm run build",
     "dev": "tsx src/cli.ts"
   },
   "dependencies": {

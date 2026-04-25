@@ -12,7 +12,7 @@ It lets you keep authoring your schema in Drizzle while running migrations with 
 ## Install
 
 ```sh
-pnpm add -D drizzle-pg-kit-migrator drizzle-kit
+npm install --save-dev drizzle-pg-kit-migrator drizzle-kit
 ```
 
 ## CLI

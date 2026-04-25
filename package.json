@@ -2,6 +2,12 @@
   "name": "drizzle-pg-kit-migrator",
   "version": "0.1.0",
   "description": "CLI glue for managing a Drizzle schema with @pgkit/migrator and @pgkit/migra: generate schema.sql, diff to create migrations, run pgkit migrations.",
+  "license": "MIT",
+  "author": "Fela Maslen <felamaslen@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/felamaslen/drizzle-pg-kit-migrator.git"
+  },
   "type": "module",
   "bin": {
     "drizzle-pg-kit-migrator": "dist/cli.js"

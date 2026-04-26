@@ -48,11 +48,7 @@ async function runPgkitSubcommand(
 
 function defaultDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      "Missing database URL. Pass --database-url or set DATABASE_URL.",
-    );
-  }
+  assert(url, "Missing database URL. Pass --database-url or set DATABASE_URL.");
   return url;
 }
 

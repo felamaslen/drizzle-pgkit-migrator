@@ -72,7 +72,7 @@ function buildProgram(): Command {
   program
     .command("migrate")
     .description(
-      "Run @pgkit/migrator. Subcommands (up, down, list, etc.) are forwarded to the pgkit migrator CLI.",
+      "Run @pgkit/migrator. Subcommands (up, list, pending, executed) are forwarded to the pgkit migrator CLI.",
     )
     .option(
       "--database-url <url>",
@@ -91,7 +91,7 @@ function buildProgram(): Command {
     .option("--migration-table <name>", "Migrations table name", "migrations")
     .argument(
       "[pgkitArgs...]",
-      "Subcommand and flags forwarded to @pgkit/migrator (e.g. `up`, `down --to <name>`, `list`)",
+      "Subcommand and flags forwarded to @pgkit/migrator (`up`, `list`, `pending`, `executed`)",
     )
     .passThroughOptions()
     .action(async (pgkitArgs: string[], opts: Record<string, string>) => {

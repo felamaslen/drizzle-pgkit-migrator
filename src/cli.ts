@@ -35,7 +35,10 @@ program
   .description(
     "Run @pgkit/migrator. Subcommands (up, down, list, etc.) are forwarded to the pgkit migrator CLI.",
   )
-  .option("--database-url <url>", "Postgres connection string (or DATABASE_URL)")
+  .option(
+    "--database-url <url>",
+    "Postgres connection string (or DATABASE_URL)",
+  )
   .option(
     "--migrations-dir <path>",
     "Directory containing .sql migration files",
@@ -110,7 +113,10 @@ program
   .description(
     "Diff schema.sql against the result of applying existing migrations and write a new migration file with the difference.",
   )
-  .option("--database-url <url>", "Postgres connection string (or DATABASE_URL)")
+  .option(
+    "--database-url <url>",
+    "Postgres connection string (or DATABASE_URL)",
+  )
   .requiredOption(
     "--schema-file <path>",
     "Path to the desired-state schema.sql",
@@ -178,7 +184,10 @@ program
   .description(
     "Backfill a database previously migrated with drizzle-kit so @pgkit/migrator sees the existing migrations as applied.",
   )
-  .option("--database-url <url>", "Postgres connection string (or DATABASE_URL)")
+  .option(
+    "--database-url <url>",
+    "Postgres connection string (or DATABASE_URL)",
+  )
   .requiredOption(
     "--migrations-dir <path>",
     "Directory containing migration .sql files",

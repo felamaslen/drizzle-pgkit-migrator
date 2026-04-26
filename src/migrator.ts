@@ -21,7 +21,9 @@ export async function createMigrator(opts: MigratorOptions): Promise<Migrator> {
   const tableName = opts.migrationTableName ?? "migrations";
 
   const pool = new pg.Pool({ connectionString: opts.databaseUrl });
-  await pool.query(`CREATE SCHEMA IF NOT EXISTS ${pg.escapeIdentifier(schema)}`);
+  await pool.query(
+    `CREATE SCHEMA IF NOT EXISTS ${pg.escapeIdentifier(schema)}`,
+  );
   await pool.end();
 
   return new Migrator({

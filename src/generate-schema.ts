@@ -141,7 +141,9 @@ export async function generateSchemaSql(
 
   snippets.sort((a, b) => a.priority - b.priority);
 
-  const preMigration = snippets.filter((s) => s.priority < 0).map((s) => s.text);
+  const preMigration = snippets
+    .filter((s) => s.priority < 0)
+    .map((s) => s.text);
   const postMigration = snippets
     .filter((s) => s.priority >= 0)
     .map((s) => s.text);

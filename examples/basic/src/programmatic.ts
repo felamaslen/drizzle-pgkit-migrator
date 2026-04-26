@@ -26,7 +26,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const exampleRoot = path.resolve(here, "..");
 
 const databaseUrl =
-  process.env.DATABASE_URL ?? "postgres://example:example@localhost:5444/example";
+  process.env.DATABASE_URL ??
+  "postgres://example:example@localhost:5444/example";
 
 const schemaDir = path.join(exampleRoot, "src/schema");
 const schemaFile = path.join(exampleRoot, "__generated__/schema.sql");

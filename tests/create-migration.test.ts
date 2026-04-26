@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createMigration } from "../src/create-migration.js";
 import { generateSchemaSql } from "../src/generate-schema.js";
+
 import { createTempDatabase } from "./db.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -64,15 +71,75 @@ describe.concurrent("createMigration", () => {
 
       expect(result.noChanges).toBe(false);
       expect(result.migrationFilePath).toBeTruthy();
-      expect(result.sql).toMatch(/CREATE TABLE\s+(?:"public"\.)?"Widgets"/i);
+      expect(result.sql).toMatchInlineSnapshot(`
+        "create extension if not exists "citext" with schema "public" version '1.8';
+
+
+          create table "public"."Widgets" (
+            "id" uuid not null default gen_random_uuid(),
+            "name" text not null,
+            "createdAt" timestamp with time zone not null default now(),
+            "updatedAt" timestamp with time zone not null default now()
+              );
+
+
+        CREATE UNIQUE INDEX "Widgets_pkey" ON public."Widgets" USING btree (id);
+
+        alter table "public"."Widgets" add constraint "Widgets_pkey" PRIMARY KEY using index "Widgets_pkey";
+
+        set check_function_bodies = off;
+
+        CREATE OR REPLACE FUNCTION public."Widgets_setUpdatedAt"()
+         RETURNS trigger
+         LANGUAGE plpgsql
+        AS $function$
+            BEGIN
+              NEW."updatedAt" := now();
+              RETURN NEW;
+            END;
+            $function$
+        ;
+
+        CREATE TRIGGER "Widgets_setUpdatedAt_trg" BEFORE UPDATE ON public."Widgets" FOR EACH ROW EXECUTE FUNCTION "Widgets_setUpdatedAt"();"
+      `);
 
       const files = readdirSync(ctx.migrationsDir);
       expect(files).toHaveLength(1);
-      expect(files[0]).toMatch(/^\d{14}-init\.sql$/);
+      expect(files[0]).toMatchInlineSnapshot(`"20260115123456-init.sql"`);
 
       const written = readFileSync(result.migrationFilePath!, "utf8");
-      expect(written).toMatch(/CREATE EXTENSION/i);
-      expect(written).toMatch(/CREATE TRIGGER/i);
+      expect(written).toMatchInlineSnapshot(`
+        "CREATE EXTENSION if NOT EXISTS "citext"
+        WITH
+          schema "public" version '1.8';
+
+        CREATE TABLE "public"."Widgets" (
+          "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+          "name" text NOT NULL,
+          "createdAt" timestamp with time zone NOT NULL DEFAULT now(),
+          "updatedAt" timestamp with time zone NOT NULL DEFAULT now()
+        );
+
+        CREATE UNIQUE INDEX "Widgets_pkey" ON public."Widgets" USING btree (id);
+
+        ALTER TABLE "public"."Widgets"
+        ADD CONSTRAINT "Widgets_pkey" PRIMARY KEY USING index "Widgets_pkey";
+
+        SET
+          check_function_bodies = off;
+
+        CREATE OR REPLACE FUNCTION public."Widgets_setUpdatedAt" () RETURNS trigger LANGUAGE plpgsql AS $function$
+            BEGIN
+              NEW."updatedAt" := now();
+              RETURN NEW;
+            END;
+            $function$;
+
+        CREATE TRIGGER "Widgets_setUpdatedAt_trg" BEFORE
+        UPDATE ON public."Widgets" FOR EACH ROW
+        EXECUTE FUNCTION "Widgets_setUpdatedAt" ();
+        "
+      `);
     } finally {
       await ctx.cleanup();
     }
@@ -139,7 +206,37 @@ describe.concurrent("createMigration", () => {
         exitCode: true,
       });
       expect(drifted.drift).toBe(true);
-      expect(drifted.sql).toMatch(/CREATE TABLE/i);
+      expect(drifted.sql).toMatchInlineSnapshot(`
+        "create extension if not exists "citext" with schema "public" version '1.8';
+
+
+          create table "public"."Widgets" (
+            "id" uuid not null default gen_random_uuid(),
+            "name" text not null,
+            "createdAt" timestamp with time zone not null default now(),
+            "updatedAt" timestamp with time zone not null default now()
+              );
+
+
+        CREATE UNIQUE INDEX "Widgets_pkey" ON public."Widgets" USING btree (id);
+
+        alter table "public"."Widgets" add constraint "Widgets_pkey" PRIMARY KEY using index "Widgets_pkey";
+
+        set check_function_bodies = off;
+
+        CREATE OR REPLACE FUNCTION public."Widgets_setUpdatedAt"()
+         RETURNS trigger
+         LANGUAGE plpgsql
+        AS $function$
+            BEGIN
+              NEW."updatedAt" := now();
+              RETURN NEW;
+            END;
+            $function$
+        ;
+
+        CREATE TRIGGER "Widgets_setUpdatedAt_trg" BEFORE UPDATE ON public."Widgets" FOR EACH ROW EXECUTE FUNCTION "Widgets_setUpdatedAt"();"
+      `);
       expect(readdirSync(ctx.migrationsDir)).toHaveLength(0);
     } finally {
       await ctx.cleanup();

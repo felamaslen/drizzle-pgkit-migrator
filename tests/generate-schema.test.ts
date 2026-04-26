@@ -45,15 +45,31 @@ describe("generateSchemaSql", () => {
     expect(extIdx).toBeGreaterThanOrEqual(0);
     expect(tableIdx).toBeGreaterThan(extIdx);
     expect(triggerIdx).toBeGreaterThan(tableIdx);
-  });
 
-  it("formats output via prettier-plugin-sql with upper-case keywords", async () => {
-    await generateSchemaSql({ schemaDir, schemaFile });
-    const sql = readFileSync(schemaFile, "utf8");
-    // prettier-plugin-sql with keywordCase: "upper" produces e.g.
-    //   CREATE TABLE "Widgets" (
-    //     "id" uuid PRIMARY KEY DEFAULT ...
-    expect(sql).toMatch(/PRIMARY KEY/);
-    expect(sql).toMatch(/NOT NULL/);
+    expect(sql).toMatchInlineSnapshot(`
+      "-- AUTO-GENERATED FILE. DO NOT EDIT.
+      -- Intermediary DB schema used for generating migrations and checking drift.
+      -- The Drizzle schema is the source of truth.
+      CREATE EXTENSION IF NOT EXISTS citext;
+
+      CREATE TABLE "Widgets" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "name" text NOT NULL,
+        "createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+        "updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+      );
+
+      CREATE OR REPLACE FUNCTION "Widgets_setUpdatedAt" () RETURNS trigger LANGUAGE plpgsql AS $$
+          BEGIN
+            NEW."updatedAt" := now();
+            RETURN NEW;
+          END;
+          $$;
+
+      CREATE TRIGGER "Widgets_setUpdatedAt_trg" BEFORE
+      UPDATE ON "Widgets" FOR EACH ROW
+      EXECUTE FUNCTION "Widgets_setUpdatedAt" ();
+      "
+    `);
   });
 });

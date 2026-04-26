@@ -21,6 +21,20 @@ import type { PgCustomSQL } from "./sql.js";
 const require = createRequire(import.meta.url);
 const prettierSqlPlugin = require.resolve("prettier-plugin-sql");
 
+// `register()` installs tsx's TS loader into Node's regular ESM module graph,
+// so the user's schema (and anything it imports) is loaded once into the same
+// module instances we already have. That means `instanceof` works,
+// `pgCustomSQL`'s function body counts toward our coverage, and there's no
+// sandbox to leak through. (`tsImport` would re-evaluate everything in a
+// fresh graph, breaking both.) Register exactly once so concurrent calls
+// don't fight over loader hook installation.
+let tsxLoaderRegistered = false;
+function ensureTsxLoaderRegistered() {
+  if (tsxLoaderRegistered) return;
+  register();
+  tsxLoaderRegistered = true;
+}
+
 export interface GenerateSchemaOptions {
   /** Drizzle schema directory (passed to `drizzle-kit generate --schema`). */
   schemaDir: string;
@@ -102,33 +116,23 @@ export async function generateSchemaSql(
     .filter((f) => f.endsWith(".ts") || f.endsWith(".js") || f.endsWith(".mjs"))
     .sort();
 
-  // `register()` installs tsx's TS loader into Node's regular ESM module graph,
-  // so the user's schema (and anything it imports) is loaded once into the same
-  // module instances we already have. That means `instanceof` works,
-  // `pgCustomSQL`'s function body counts toward our coverage, and there's no
-  // sandbox to leak through. (`tsImport` would re-evaluate everything in a
-  // fresh graph, breaking both.)
-  const unregister = register();
+  ensureTsxLoaderRegistered();
   const seen = new Set<string>();
-  try {
-    for (const file of schemaFiles) {
-      const fileUrl = pathToFileURL(path.resolve(schemaDir, file)).href;
-      const mod = (await import(fileUrl)) as Record<string, unknown>;
-      for (const value of Object.values(mod)) {
-        if (!isPgCustomSQL(value)) continue;
-        const text = sqlToString(value.sql);
-        const priority = value.priority ?? 0;
-        const key = `${priority}\0${text}`;
-        // A schema `index.ts` that re-exports from sibling files would
-        // otherwise add every snippet twice (once on direct import, once via
-        // the re-export). Dedupe on `(priority, text)`.
-        if (seen.has(key)) continue;
-        seen.add(key);
-        snippets.push({ text, priority });
-      }
+  for (const file of schemaFiles) {
+    const fileUrl = pathToFileURL(path.resolve(schemaDir, file)).href;
+    const mod = (await import(fileUrl)) as Record<string, unknown>;
+    for (const value of Object.values(mod)) {
+      if (!isPgCustomSQL(value)) continue;
+      const text = sqlToString(value.sql);
+      const priority = value.priority ?? 0;
+      const key = `${priority}\0${text}`;
+      // A schema `index.ts` that re-exports from sibling files would
+      // otherwise add every snippet twice (once on direct import, once via
+      // the re-export). Dedupe on `(priority, text)`.
+      if (seen.has(key)) continue;
+      seen.add(key);
+      snippets.push({ text, priority });
     }
-  } finally {
-    unregister();
   }
 
   snippets.sort((a, b) => a.priority - b.priority);

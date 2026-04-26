@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -87,9 +88,10 @@ function timestamp() {
 export async function createMigration(
   opts: CreateMigrationOptions,
 ): Promise<CreateMigrationResult> {
-  if (!opts.exitCode && !opts.name) {
-    throw new Error("`name` is required unless `exitCode` is set");
-  }
+  assert(
+    opts.exitCode || opts.name,
+    "`name` is required unless `exitCode` is set",
+  );
 
   const schemaPath = path.resolve(opts.schemaFile);
   const migrationsDir = path.resolve(opts.migrationsDir);

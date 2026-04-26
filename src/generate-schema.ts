@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { execSync } from "node:child_process";
 import {
   mkdtempSync,
@@ -100,11 +101,10 @@ export async function generateSchemaSql(
     }
 
     const sqlFiles = readdirSync(tempDir).filter((f) => f.endsWith(".sql"));
-    if (sqlFiles.length !== 1) {
-      throw new Error(
-        `Expected exactly 1 SQL file in ${tempDir}, found ${sqlFiles.length}`,
-      );
-    }
+    assert(
+      sqlFiles.length === 1,
+      `Expected exactly 1 SQL file in ${tempDir}, found ${sqlFiles.length}`,
+    );
 
     migrationSql = readFileSync(path.join(tempDir, sqlFiles[0]!), "utf8");
     migrationSql = migrationSql.replaceAll("--> statement-breakpoint", "");

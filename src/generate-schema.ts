@@ -14,9 +14,9 @@ import { pathToFileURL } from "node:url";
 
 import { StringChunk } from "drizzle-orm";
 import * as prettier from "prettier";
-import { tsImport } from "tsx/esm/api";
+import { register } from "tsx/esm/api";
 
-import { PgCustomSQL } from "./sql.js";
+import type { PgCustomSQL } from "./sql.js";
 
 const require = createRequire(import.meta.url);
 const prettierSqlPlugin = require.resolve("prettier-plugin-sql");
@@ -40,36 +40,20 @@ const DEFAULT_HEADER = [
 
 function sqlToString(sql: { queryChunks: unknown[] }): string {
   return sql.queryChunks
-    .flatMap((chunk) => {
-      if (chunk instanceof StringChunk) return chunk.value;
-      // `tsImport` loads the schema in a fresh module graph, so a `StringChunk`
-      // built there is not the same class as ours. Fall back to a structural
-      // check on the chunk's `value` array.
-      if (
-        chunk &&
-        typeof chunk === "object" &&
-        Array.isArray((chunk as { value?: unknown }).value)
-      ) {
-        return (chunk as { value: string[] }).value;
-      }
-      return [];
-    })
+    .flatMap((chunk) => (chunk instanceof StringChunk ? chunk.value : []))
     .join("")
     .trim();
 }
 
 function isPgCustomSQL(value: unknown): value is PgCustomSQL {
-  if (value instanceof PgCustomSQL) return true;
-  // Cross-realm fallback (see comment in `sqlToString`).
-  if (
-    value &&
-    typeof value === "object" &&
-    value.constructor?.name === "PgCustomSQL" &&
-    "sql" in value
-  ) {
-    return true;
-  }
-  return false;
+  if (typeof value !== "object" || value === null) return false;
+  if (!("sql" in value)) return false;
+  const inner = (value as { sql: unknown }).sql;
+  return (
+    typeof inner === "object" &&
+    inner !== null &&
+    Array.isArray((inner as { queryChunks?: unknown }).queryChunks)
+  );
 }
 
 export async function generateSchemaSql(
@@ -118,25 +102,33 @@ export async function generateSchemaSql(
     .filter((f) => f.endsWith(".ts") || f.endsWith(".js") || f.endsWith(".mjs"))
     .sort();
 
-  const parentUrl = import.meta.url;
+  // `register()` installs tsx's TS loader into Node's regular ESM module graph,
+  // so the user's schema (and anything it imports) is loaded once into the same
+  // module instances we already have. That means `instanceof` works,
+  // `pgCustomSQL`'s function body counts toward our coverage, and there's no
+  // sandbox to leak through. (`tsImport` would re-evaluate everything in a
+  // fresh graph, breaking both.)
+  const unregister = register();
   const seen = new Set<string>();
-  for (const file of schemaFiles) {
-    const fileUrl = pathToFileURL(path.resolve(schemaDir, file)).href;
-    const mod = (await tsImport(fileUrl, parentUrl)) as Record<string, unknown>;
-    for (const value of Object.values(mod)) {
-      if (!isPgCustomSQL(value)) continue;
-      const text = sqlToString(
-        value.sql as unknown as { queryChunks: unknown[] },
-      );
-      const priority = value.options?.priority ?? 0;
-      const key = `${priority}\0${text}`;
-      // A schema `index.ts` that re-exports from sibling files would otherwise
-      // make every snippet appear twice — once on direct import, once via the
-      // re-export. Dedupe on `(priority, text)`.
-      if (seen.has(key)) continue;
-      seen.add(key);
-      snippets.push({ text, priority });
+  try {
+    for (const file of schemaFiles) {
+      const fileUrl = pathToFileURL(path.resolve(schemaDir, file)).href;
+      const mod = (await import(fileUrl)) as Record<string, unknown>;
+      for (const value of Object.values(mod)) {
+        if (!isPgCustomSQL(value)) continue;
+        const text = sqlToString(value.sql);
+        const priority = value.priority ?? 0;
+        const key = `${priority}\0${text}`;
+        // A schema `index.ts` that re-exports from sibling files would
+        // otherwise add every snippet twice (once on direct import, once via
+        // the re-export). Dedupe on `(priority, text)`.
+        if (seen.has(key)) continue;
+        seen.add(key);
+        snippets.push({ text, priority });
+      }
     }
+  } finally {
+    unregister();
   }
 
   snippets.sort((a, b) => a.priority - b.priority);

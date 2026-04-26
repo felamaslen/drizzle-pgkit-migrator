@@ -13,4 +13,4 @@ export type {
 export { backfillMigrations } from "./backfill.js";
 export type { BackfillOptions } from "./backfill.js";
 
-export { PgCustomSQL, pgCustomSQL } from "./sql.js";
+export { type PgCustomSQL, pgCustomSQL } from "./sql.js";

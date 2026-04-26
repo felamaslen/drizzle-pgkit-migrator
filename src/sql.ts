@@ -1,14 +1,10 @@
 import type { SQL } from "drizzle-orm";
 
-/** Marker class for custom SQL snippets injected into the generated `schema.sql`. */
-export class PgCustomSQL {
-  constructor(
-    public readonly sql: SQL,
-    public readonly options?: {
-      priority?: number;
-    },
-  ) {}
-}
+/** Marker type for custom SQL snippets injected into the generated `schema.sql`. */
+export type PgCustomSQL = {
+  priority?: number;
+  sql: SQL;
+};
 
 /**
  * Injects a raw SQL snippet into the generated `schema.sql` file.
@@ -22,5 +18,5 @@ export function pgCustomSQL(
   sql: SQL,
   options?: { priority?: number },
 ): PgCustomSQL {
-  return new PgCustomSQL(sql, options);
+  return { sql, ...options };
 }

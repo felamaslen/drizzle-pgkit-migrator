@@ -29,10 +29,20 @@
     "build": "tsc -p tsconfig.json",
     "prepublishOnly": "npm run build",
     "dev": "tsx src/cli.ts",
+    "lint": "eslint --max-warnings=0 .",
+    "lint:fix": "eslint --fix .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:db:up": "docker compose up -d --wait",
-    "test:db:down": "docker compose down -v"
+    "test:db:down": "docker compose down -v",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,js,mjs,cjs}": "eslint --max-warnings=0 --fix",
+    "*.{json,md,yml,yaml}": "prettier --write"
   },
   "dependencies": {
     "@pgkit/migra": "^0.6.1",
@@ -49,10 +59,18 @@
     "drizzle-kit": ">=0.30.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "lint-staged": "^16.4.0",
+    "simple-git-hooks": "^2.13.1",
     "typescript": "~5.9.2",
+    "typescript-eslint": "^8.59.0",
     "vitest": "^4.1.4"
   },
   "engines": {

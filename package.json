@@ -4,6 +4,25 @@
   "description": "CLI glue for managing a Drizzle schema with @pgkit/migrator and @pgkit/migra: generate schema.sql, diff to create migrations, run pgkit migrations.",
   "license": "MIT",
   "author": "Fela Maslen <felamaslen@gmail.com>",
+  "keywords": [
+    "drizzle",
+    "drizzle-orm",
+    "drizzle-kit",
+    "postgres",
+    "postgresql",
+    "pg",
+    "pgkit",
+    "@pgkit/migrator",
+    "@pgkit/migra",
+    "migration",
+    "migrations",
+    "database-migrations",
+    "schema",
+    "schema-diff",
+    "drift-detection",
+    "cli",
+    "typescript"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/felamaslen/drizzle-pgkit-migrator.git"

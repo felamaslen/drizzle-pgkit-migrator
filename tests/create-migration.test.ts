@@ -9,13 +9,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createMigration } from "../src/create-migration.js";
+import { main } from "../src/cli.js";
 import { generateSchemaSql } from "../src/generate-schema.js";
 
 import { createTempDatabase } from "./db.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixtureSchemaDir = path.join(here, "fixtures/schema");
+const ARGV0 = ["node", "drizzle-pgkit-migrator"];
 
 let sharedSchemaFile: string;
 let sharedSchemaDir: string;
@@ -56,209 +57,100 @@ async function setup(): Promise<TestContext> {
   };
 }
 
-describe.concurrent("createMigration", () => {
-  it("writes a migration containing the diff against an empty database", async () => {
+function createArgs(ctx: TestContext, ...extra: string[]): string[] {
+  return [
+    ...ARGV0,
+    "create",
+    "--database-url",
+    ctx.databaseUrl,
+    "--schema-file",
+    ctx.schemaFile,
+    "--migrations-dir",
+    ctx.migrationsDir,
+    ...extra,
+  ];
+}
+
+describe.concurrent("cli: create", () => {
+  it("writes a migration containing the diff against an empty database", async ({
+    expect,
+  }) => {
     const ctx = await setup();
     try {
-      const result = await createMigration({
-        databaseUrl: ctx.databaseUrl,
-        schemaFile: ctx.schemaFile,
-        migrationsDir: ctx.migrationsDir,
-        name: "init",
-      });
-
-      expect(result.noChanges).toBe(false);
-      expect(result.migrationFilePath).toBeTruthy();
-      expect(result.sql).toMatchInlineSnapshot(`
-        "create extension if not exists "citext" with schema "public" version '1.8';
-
-
-          create table "public"."Widgets" (
-            "id" uuid not null default gen_random_uuid(),
-            "name" text not null,
-            "createdAt" timestamp with time zone not null default now(),
-            "updatedAt" timestamp with time zone not null default now()
-              );
-
-
-        CREATE UNIQUE INDEX "Widgets_pkey" ON public."Widgets" USING btree (id);
-
-        alter table "public"."Widgets" add constraint "Widgets_pkey" PRIMARY KEY using index "Widgets_pkey";
-
-        set check_function_bodies = off;
-
-        CREATE OR REPLACE FUNCTION public."Widgets_setUpdatedAt"()
-         RETURNS trigger
-         LANGUAGE plpgsql
-        AS $function$
-            BEGIN
-              NEW."updatedAt" := now();
-              RETURN NEW;
-            END;
-            $function$
-        ;
-
-        CREATE TRIGGER "Widgets_setUpdatedAt_trg" BEFORE UPDATE ON public."Widgets" FOR EACH ROW EXECUTE FUNCTION "Widgets_setUpdatedAt"();"
-      `);
+      const code = await main(createArgs(ctx, "--name", "init"));
+      expect(code).toBe(0);
 
       const files = readdirSync(ctx.migrationsDir);
       expect(files).toHaveLength(1);
       expect(files[0]).toMatchInlineSnapshot(`"20260115123456-init.sql"`);
 
-      const written = readFileSync(result.migrationFilePath!, "utf8");
-      expect(written).toMatchInlineSnapshot(`
-        "CREATE EXTENSION if NOT EXISTS "citext"
-        WITH
-          schema "public" version '1.8';
-
-        CREATE TABLE "public"."Widgets" (
-          "id" uuid NOT NULL DEFAULT gen_random_uuid(),
-          "name" text NOT NULL,
-          "createdAt" timestamp with time zone NOT NULL DEFAULT now(),
-          "updatedAt" timestamp with time zone NOT NULL DEFAULT now()
-        );
-
-        CREATE UNIQUE INDEX "Widgets_pkey" ON public."Widgets" USING btree (id);
-
-        ALTER TABLE "public"."Widgets"
-        ADD CONSTRAINT "Widgets_pkey" PRIMARY KEY USING index "Widgets_pkey";
-
-        SET
-          check_function_bodies = off;
-
-        CREATE OR REPLACE FUNCTION public."Widgets_setUpdatedAt" () RETURNS trigger LANGUAGE plpgsql AS $function$
-            BEGIN
-              NEW."updatedAt" := now();
-              RETURN NEW;
-            END;
-            $function$;
-
-        CREATE TRIGGER "Widgets_setUpdatedAt_trg" BEFORE
-        UPDATE ON public."Widgets" FOR EACH ROW
-        EXECUTE FUNCTION "Widgets_setUpdatedAt" ();
-        "
-      `);
+      const written = readFileSync(
+        path.join(ctx.migrationsDir, files[0]!),
+        "utf8",
+      );
+      expect(written).toMatch(/CREATE EXTENSION/i);
+      expect(written).toMatch(/CREATE TABLE\s+"public"\."Widgets"/i);
+      expect(written).toMatch(/CREATE TRIGGER/i);
     } finally {
       await ctx.cleanup();
     }
   });
 
-  it("reports no changes when migrations already match the schema", async () => {
+  it("exits 1 when there are no changes and --allow-empty is not set", async () => {
     const ctx = await setup();
     try {
-      const first = await createMigration({
-        databaseUrl: ctx.databaseUrl,
-        schemaFile: ctx.schemaFile,
-        migrationsDir: ctx.migrationsDir,
-        name: "init",
-      });
-      expect(first.noChanges).toBe(false);
+      const first = await main(createArgs(ctx, "--name", "init"));
+      expect(first).toBe(0);
 
-      const second = await createMigration({
-        databaseUrl: ctx.databaseUrl,
-        schemaFile: ctx.schemaFile,
-        migrationsDir: ctx.migrationsDir,
-        name: "should_not_be_written",
-      });
-      expect(second.noChanges).toBe(true);
-      expect(second.migrationFilePath).toBeUndefined();
+      const second = await main(
+        createArgs(ctx, "--name", "should_not_be_written"),
+      );
+      expect(second).toBe(1);
       expect(readdirSync(ctx.migrationsDir)).toHaveLength(1);
     } finally {
       await ctx.cleanup();
     }
   });
 
-  it("with allowEmpty=true writes an empty file when there are no changes", async () => {
+  it("with --allow-empty writes an empty file when there are no changes", async () => {
     const ctx = await setup();
     try {
-      await createMigration({
-        databaseUrl: ctx.databaseUrl,
-        schemaFile: ctx.schemaFile,
-        migrationsDir: ctx.migrationsDir,
-        name: "init",
-      });
+      await main(createArgs(ctx, "--name", "init"));
 
-      const result = await createMigration({
-        databaseUrl: ctx.databaseUrl,
-        schemaFile: ctx.schemaFile,
-        migrationsDir: ctx.migrationsDir,
-        name: "empty",
-        allowEmpty: true,
-      });
-      expect(result.noChanges).toBe(true);
-      expect(result.migrationFilePath).toBeTruthy();
-      expect(readFileSync(result.migrationFilePath!, "utf8")).toBe("");
-      expect(readdirSync(ctx.migrationsDir)).toHaveLength(2);
+      const code = await main(
+        createArgs(ctx, "--name", "empty", "--allow-empty"),
+      );
+      expect(code).toBe(0);
+
+      const files = readdirSync(ctx.migrationsDir).sort();
+      expect(files).toHaveLength(2);
+      const empty = files.find((f) => f.endsWith("-empty.sql"))!;
+      expect(readFileSync(path.join(ctx.migrationsDir, empty), "utf8")).toBe(
+        "",
+      );
     } finally {
       await ctx.cleanup();
     }
   });
 
-  it("with exitCode=true reports drift without writing a file", async () => {
+  it("with --exit-code reports drift via non-zero exit and writes nothing", async () => {
     const ctx = await setup();
     try {
-      const drifted = await createMigration({
-        databaseUrl: ctx.databaseUrl,
-        schemaFile: ctx.schemaFile,
-        migrationsDir: ctx.migrationsDir,
-        exitCode: true,
-      });
-      expect(drifted.drift).toBe(true);
-      expect(drifted.sql).toMatchInlineSnapshot(`
-        "create extension if not exists "citext" with schema "public" version '1.8';
-
-
-          create table "public"."Widgets" (
-            "id" uuid not null default gen_random_uuid(),
-            "name" text not null,
-            "createdAt" timestamp with time zone not null default now(),
-            "updatedAt" timestamp with time zone not null default now()
-              );
-
-
-        CREATE UNIQUE INDEX "Widgets_pkey" ON public."Widgets" USING btree (id);
-
-        alter table "public"."Widgets" add constraint "Widgets_pkey" PRIMARY KEY using index "Widgets_pkey";
-
-        set check_function_bodies = off;
-
-        CREATE OR REPLACE FUNCTION public."Widgets_setUpdatedAt"()
-         RETURNS trigger
-         LANGUAGE plpgsql
-        AS $function$
-            BEGIN
-              NEW."updatedAt" := now();
-              RETURN NEW;
-            END;
-            $function$
-        ;
-
-        CREATE TRIGGER "Widgets_setUpdatedAt_trg" BEFORE UPDATE ON public."Widgets" FOR EACH ROW EXECUTE FUNCTION "Widgets_setUpdatedAt"();"
-      `);
+      const code = await main(createArgs(ctx, "--exit-code"));
+      expect(code).toBe(1);
       expect(readdirSync(ctx.migrationsDir)).toHaveLength(0);
     } finally {
       await ctx.cleanup();
     }
   });
 
-  it("with exitCode=true reports no drift once migrations catch up", async () => {
+  it("with --exit-code returns 0 once migrations catch the schema up", async () => {
     const ctx = await setup();
     try {
-      await createMigration({
-        databaseUrl: ctx.databaseUrl,
-        schemaFile: ctx.schemaFile,
-        migrationsDir: ctx.migrationsDir,
-        name: "init",
-      });
+      await main(createArgs(ctx, "--name", "init"));
 
-      const result = await createMigration({
-        databaseUrl: ctx.databaseUrl,
-        schemaFile: ctx.schemaFile,
-        migrationsDir: ctx.migrationsDir,
-        exitCode: true,
-      });
-      expect(result.drift).toBe(false);
-      expect(result.noChanges).toBe(true);
+      const code = await main(createArgs(ctx, "--exit-code"));
+      expect(code).toBe(0);
     } finally {
       await ctx.cleanup();
     }

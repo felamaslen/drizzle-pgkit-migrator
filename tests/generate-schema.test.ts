@@ -3,71 +3,99 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { generateSchemaSql } from "../src/generate-schema.js";
+import { main } from "../src/cli.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const schemaDir = path.join(here, "fixtures/schema");
+const fixtureSchemaDir = path.join(here, "fixtures/schema");
+const ARGV0 = ["node", "drizzle-pgkit-migrator"];
 
-describe("generateSchemaSql", () => {
-  let outDir: string;
-  let schemaFile: string;
+interface TestContext {
+  outDir: string;
+  schemaFile: string;
+  cleanup: () => void;
+}
 
-  beforeEach(() => {
-    outDir = mkdtempSync(path.join(tmpdir(), "dpkm-test-"));
-    schemaFile = path.join(outDir, "schema.sql");
-  });
+function setup(): TestContext {
+  const outDir = mkdtempSync(path.join(tmpdir(), "dpkm-test-"));
+  const schemaFile = path.join(outDir, "schema.sql");
+  return {
+    outDir,
+    schemaFile,
+    cleanup: () => rmSync(outDir, { recursive: true, force: true }),
+  };
+}
 
-  afterEach(() => {
-    rmSync(outDir, { recursive: true, force: true });
-  });
+describe.concurrent("cli: generate-schema", () => {
+  it("writes a schema.sql containing tables and pgCustomSQL snippets in priority order", async ({
+    expect,
+  }) => {
+    const ctx = setup();
+    try {
+      const code = await main([
+        ...ARGV0,
+        "generate-schema",
+        "--schema-dir",
+        fixtureSchemaDir,
+        "--schema-file",
+        ctx.schemaFile,
+      ]);
 
-  it("writes a schema.sql containing tables and pgCustomSQL snippets in priority order", async () => {
-    const result = await generateSchemaSql({ schemaDir, schemaFile });
+      expect(code).toBe(0);
 
-    expect(result.preCount).toBe(1);
-    expect(result.postCount).toBe(1);
+      const sql = readFileSync(ctx.schemaFile, "utf8");
 
-    const sql = readFileSync(schemaFile, "utf8");
-
-    // Pre-migration snippet (negative priority) appears.
-    expect(sql).toMatch(/CREATE EXTENSION IF NOT EXISTS citext/i);
-    // Drizzle table appears.
-    expect(sql).toMatch(/CREATE TABLE "Widgets"/);
-    // Post-migration snippet (positive priority) appears.
-    expect(sql).toMatch(/CREATE TRIGGER "Widgets_setUpdatedAt_trg"/);
-
-    // Pre-migration must come before the table; post-migration after.
-    const extIdx = sql.search(/CREATE EXTENSION IF NOT EXISTS citext/i);
-    const tableIdx = sql.search(/CREATE TABLE "Widgets"/);
-    const triggerIdx = sql.search(/CREATE TRIGGER "Widgets_setUpdatedAt_trg"/);
-    expect(extIdx).toBeGreaterThanOrEqual(0);
-    expect(tableIdx).toBeGreaterThan(extIdx);
-    expect(triggerIdx).toBeGreaterThan(tableIdx);
-
-    expect(sql).toMatchInlineSnapshot(`
-      "-- AUTO-GENERATED FILE. DO NOT EDIT.
-      -- Intermediary DB schema used for generating migrations and checking drift.
-      -- The Drizzle schema is the source of truth.
-      CREATE EXTENSION IF NOT EXISTS citext;
-
-      CREATE TABLE "Widgets" (
-        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-        "name" text NOT NULL,
-        "createdAt" timestamp with time zone DEFAULT now() NOT NULL,
-        "updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+      // Pre-migration must come before the table; post-migration after.
+      const extIdx = sql.search(/CREATE EXTENSION IF NOT EXISTS citext/i);
+      const tableIdx = sql.search(/CREATE TABLE "Widgets"/);
+      const triggerIdx = sql.search(
+        /CREATE TRIGGER "Widgets_setUpdatedAt_trg"/,
       );
+      expect(extIdx).toBeGreaterThanOrEqual(0);
+      expect(tableIdx).toBeGreaterThan(extIdx);
+      expect(triggerIdx).toBeGreaterThan(tableIdx);
 
-      CREATE OR REPLACE FUNCTION "Widgets_setUpdatedAt" () RETURNS trigger LANGUAGE plpgsql AS $$
-          BEGIN
-            NEW."updatedAt" := now();
-            RETURN NEW;
-          END;
-          $$;
+      expect(sql).toMatchInlineSnapshot(`
+        "-- AUTO-GENERATED FILE. DO NOT EDIT.
+        -- Intermediary DB schema used for generating migrations and checking drift.
+        -- The Drizzle schema is the source of truth.
+        CREATE EXTENSION IF NOT EXISTS citext;
 
-      CREATE TRIGGER "Widgets_setUpdatedAt_trg" BEFORE
-      UPDATE ON "Widgets" FOR EACH ROW
-      EXECUTE FUNCTION "Widgets_setUpdatedAt" ();
-      "
-    `);
+        CREATE TABLE "Widgets" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "name" text NOT NULL,
+          "createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+          "updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+        );
+
+        CREATE OR REPLACE FUNCTION "Widgets_setUpdatedAt" () RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN
+              NEW."updatedAt" := now();
+              RETURN NEW;
+            END;
+            $$;
+
+        CREATE TRIGGER "Widgets_setUpdatedAt_trg" BEFORE
+        UPDATE ON "Widgets" FOR EACH ROW
+        EXECUTE FUNCTION "Widgets_setUpdatedAt" ();
+        "
+      `);
+    } finally {
+      ctx.cleanup();
+    }
+  });
+
+  it("exits non-zero when --schema-dir is missing", async () => {
+    const ctx = setup();
+    try {
+      const code = await main([
+        ...ARGV0,
+        "generate-schema",
+        "--schema-file",
+        ctx.schemaFile,
+      ]);
+      expect(code).not.toBe(0);
+    } finally {
+      ctx.cleanup();
+    }
   });
 });

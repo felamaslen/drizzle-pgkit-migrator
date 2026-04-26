@@ -250,9 +250,9 @@ function buildProgram(): Command {
 }
 
 /**
- * Parse and run the CLI for the given `argv`. Returns the exit code: zero on
- * success, non-zero on any handled error. Unrelated thrown errors propagate
- * (those are bugs).
+ * Parse and run the CLI for the given `argv`, returning the exit code (`0` on success, non-zero on any handled error).
+ *
+ * Designed for tests and other in-process drivers: commander's `exitOverride` is enabled so this function never calls `process.exit`, and action errors are translated into the return value rather than `process.exitCode`. Pass a full `argv` array including the `[node, script]` prefix — defaults to `process.argv`. Unrelated thrown errors propagate (treat them as bugs).
  */
 export async function main(argv: string[] = process.argv): Promise<number> {
   const program = buildProgram();

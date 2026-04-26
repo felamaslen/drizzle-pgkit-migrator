@@ -5,18 +5,22 @@ import pg from "pg";
 
 import { logger } from "./logger.js";
 
+/** Options accepted by {@link backfillMigrations}. */
 export interface BackfillOptions {
+  /** Postgres connection string for the database to backfill. */
   databaseUrl: string;
+  /** Directory containing the `.sql` migration files whose names should be marked as already applied. Files that don't end in `.sql` are ignored. */
   migrationsDir: string;
-  /** Schema name for the pgkit migrations table. Defaults to `migrator_internal`. */
+  /** Target schema for the pgkit migrations table. Created on demand. Defaults to `"migrator_internal"`. */
   migrationSchema?: string;
-  /** Source drizzle migrations table name. Defaults to `drizzle.__drizzle_migrations`. */
+  /** Fully-qualified name of the source drizzle migrations table (must include the schema). Defaults to `"drizzle.__drizzle_migrations"`. */
   drizzleMigrationsTable?: string;
 }
 
 /**
- * Backfills a database that was previously migrated with drizzle-kit so that
- * `@pgkit/migrator` sees the existing migrations as already applied.
+ * Backfill a database that was previously migrated with `drizzle-kit` so that `@pgkit/migrator` treats the existing migrations as already applied.
+ *
+ * For each `.sql` file in `migrationsDir`, inserts one row into `migrationSchema.migrations` with `status = 'executed'`, copying the timestamp from the corresponding row in `drizzleMigrationsTable` (matched by position via `to_timestamp(created_at / 1000)`). The insert is `ON CONFLICT DO NOTHING`, so the operation is idempotent — re-running won't duplicate rows. The pgkit migrations schema/table are created on demand if they don't already exist.
  */
 export async function backfillMigrations(opts: BackfillOptions): Promise<void> {
   const schema = opts.migrationSchema ?? "migrator_internal";

@@ -35,14 +35,15 @@ function ensureTsxLoaderRegistered() {
   tsxLoaderRegistered = true;
 }
 
+/** Options accepted by {@link generateSchemaSql}. */
 export interface GenerateSchemaOptions {
-  /** Drizzle schema directory (passed to `drizzle-kit generate --schema`). */
+  /** Directory containing the Drizzle schema files. Forwarded to `drizzle-kit generate --schema`, and also walked directly so any `pgCustomSQL` snippets exported from those files can be picked up. */
   schemaDir: string;
-  /** Output schema.sql file path. */
+  /** Filesystem path where the generated `schema.sql` will be written, overwriting any existing file. */
   schemaFile: string;
-  /** Path to drizzle-kit binary. Defaults to `npx drizzle-kit`. */
+  /** Command used to invoke drizzle-kit. Defaults to `"npx drizzle-kit"`; override to point at a workspace-local binary or to use a different package manager (e.g. `"pnpm exec drizzle-kit"`). */
   drizzleKitCommand?: string;
-  /** Header comment to write at the top of the file. */
+  /** Lines emitted as a comment block at the top of the generated file. Defaults to a three-line "auto-generated" notice. */
   header?: string[];
 }
 
@@ -70,6 +71,13 @@ function isPgCustomSQL(value: unknown): value is PgCustomSQL {
   );
 }
 
+/**
+ * Generate a single `schema.sql` describing the desired database state from a Drizzle schema.
+ *
+ * Runs `drizzle-kit generate` into a throwaway directory to get the table/index/constraint DDL, then walks `schemaDir` for any `pgCustomSQL` snippets and weaves them in (negative `priority` before tables, non-negative after). The result is formatted with `prettier-plugin-sql` (Postgres dialect, upper-case keywords) and written to `schemaFile`.
+ *
+ * Returns the number of snippets placed before (`preCount`) and after (`postCount`) the drizzle-kit output — handy for a one-line summary log.
+ */
 export async function generateSchemaSql(
   opts: GenerateSchemaOptions,
 ): Promise<{ preCount: number; postCount: number }> {

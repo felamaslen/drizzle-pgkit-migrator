@@ -13,34 +13,37 @@ import { createMigrator } from "./migrator.js";
 const require = createRequire(import.meta.url);
 const prettierSqlPlugin = require.resolve("prettier-plugin-sql");
 
+/** Options accepted by {@link createMigration}. */
 export interface CreateMigrationOptions {
+  /** Postgres connection string used as an admin connection: the function creates two throwaway databases on the same cluster (one to load `schemaFile` into, one to apply existing migrations to) and drops them afterwards. */
   databaseUrl: string;
-  /** Path to the generated schema.sql (the desired state). */
+  /** Filesystem path to the desired-state `schema.sql` — typically the output of {@link generateSchemaSql}. */
   schemaFile: string;
-  /** Directory containing existing migration .sql files. */
+  /** Directory containing existing migration `.sql` files. The new migration is written here on success. */
   migrationsDir: string;
-  /** Migration name. Required unless `exitCode` is true. */
+  /** Filename stem for the new migration (the timestamp prefix is added automatically: `YYYYMMDDHHmmss-<name>.sql`). Required unless `exitCode` is `true`. */
   name?: string;
-  /** When true, exit non-zero if there is drift; do not write a file. */
+  /** Drift-check mode: report drift via the result instead of writing a file. The function never touches the filesystem in this mode. */
   exitCode?: boolean;
-  /** When true and there is no drift, write an empty migration file. */
+  /** When `true` and there is no diff, still write an empty migration file. Useful when you want a no-op migration to mark a manual change. Ignored when `exitCode` is set. */
   allowEmpty?: boolean;
-  /** Migration table schema. Defaults to `migrator_internal`. */
+  /** Schema holding the migrations bookkeeping table (the same schema used by {@link createMigrator}). Excluded from the diff so its presence in the "current" DB doesn't show up as drift. Defaults to `"migrator_internal"`. */
   migrationSchema?: string;
-  /** Schemas to exclude from the diff. Defaults to `[migrationSchema]`. */
+  /** Schemas to exclude from the migra diff. Defaults to `[migrationSchema]`; override to keep additional schemas (e.g. extension-managed ones) out of the generated SQL. */
   excludeSchema?: string[];
-  /** Run `prettier --write` on the new migration file. Defaults to true. */
+  /** Format the new migration file with `prettier-plugin-sql` (Postgres dialect, upper-case keywords). Defaults to `true`. */
   formatWithPrettier?: boolean;
 }
 
+/** Result returned by {@link createMigration}. */
 export interface CreateMigrationResult {
-  /** When `exitCode` is true: drift was detected. */
+  /** Only set when called with `exitCode: true`. `true` if the diff was non-empty (i.e. the migrations don't yet match `schemaFile`). */
   drift?: boolean;
-  /** Path to the migration file that was written, if any. */
+  /** Path to the migration file that was written, if any. Unset when `exitCode` is `true`, or when no diff was found and `allowEmpty` was not set. */
   migrationFilePath?: string;
-  /** True if no diff was found. */
+  /** `true` when the diff was empty — schema and applied migrations agree. */
   noChanges: boolean;
-  /** Diff SQL (when there are changes). */
+  /** Raw diff SQL produced by `@pgkit/migra`. Set whenever there is a non-empty diff (regardless of whether a file was written). */
   sql?: string;
 }
 
@@ -85,6 +88,13 @@ function timestamp() {
   ].join("");
 }
 
+/**
+ * Diff `schemaFile` (desired state) against the result of replaying every migration in `migrationsDir` (current state) and write a new migration containing the difference.
+ *
+ * Mechanism: two temporary databases are created on the same cluster as `databaseUrl`. The first is loaded from `schemaFile`; the second has the existing migrations applied via {@link createMigrator}. `@pgkit/migra` then diffs the two and the result is written as `migrationsDir/YYYYMMDDHHmmss-<name>.sql` (formatted with `prettier-plugin-sql` unless `formatWithPrettier: false`). Both temp databases are dropped before this function returns, even on error.
+ *
+ * Use `exitCode: true` for a non-destructive drift check (e.g. in CI) — the function reports the diff via the {@link CreateMigrationResult} without touching the filesystem.
+ */
 export async function createMigration(
   opts: CreateMigrationOptions,
 ): Promise<CreateMigrationResult> {
